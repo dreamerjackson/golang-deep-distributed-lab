@@ -52,13 +52,15 @@ package labrpc
 
 import (
 	"bytes"
-	"encoding/gob"
 	"log"
 	"math/rand"
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"6.824-lab/labgob"
 )
 
 type reqMsg struct {
@@ -74,8 +76,9 @@ type replyMsg struct {
 	reply []byte
 }
 type ClientEnd struct {
-	endname interface{} // this end-point's name
-	ch      chan reqMsg // copy of Network.endCh
+	endname interface{}   // this end-point's name
+	ch      chan reqMsg   // copy of Network.endCh
+	done    chan struct{} // closed when Network is cleaned up
 }
 
 // send an RPC, wait for the reply.
@@ -89,16 +92,25 @@ func (e *ClientEnd) Call(svcMeth string, args interface{}, reply interface{}) bo
 	req.replyCh = make(chan replyMsg)
 
 	qb := new(bytes.Buffer)
-	qe := gob.NewEncoder(qb)
+	qe := labgob.NewEncoder(qb)
 	qe.Encode(args)
 	req.args = qb.Bytes()
 
-	e.ch <- req
+	//
+	// send the request.
+	//
+	select {
+	case e.ch <- req:
+		// the request has been sent.
+	case <-e.done:
+		// entire Network has been destroyed.
+		return false
+	}
 
 	rep := <-req.replyCh
 	if rep.ok {
 		rb := bytes.NewBuffer(rep.reply)
-		rd := gob.NewDecoder(rb)
+		rd := labgob.NewDecoder(rb)
 		if err := rd.Decode(reply); err != nil {
 			log.Fatalf("ClientEnd.Call(): decode reply: %v\n", err)
 		}
@@ -118,6 +130,9 @@ type Network struct {
 	servers        map[interface{}]*Server     // servers, by name
 	connections    map[interface{}]interface{} // endname -> servername
 	endCh          chan reqMsg
+	done           chan struct{} // closed when Network is cleaned up
+	count          int32         // total RPC count, for statistics
+	bytes          int64         // total bytes send, for statistics
 }
 
 func MakeNetwork() *Network {
@@ -128,15 +143,27 @@ func MakeNetwork() *Network {
 	rn.servers = map[interface{}]*Server{}
 	rn.connections = map[interface{}](interface{}){}
 	rn.endCh = make(chan reqMsg)
+	rn.done = make(chan struct{})
 
 	// single goroutine to handle all ClientEnd.Call()s
 	go func() {
-		for xreq := range rn.endCh {
-			go rn.ProcessReq(xreq)
+		for {
+			select {
+			case xreq := <-rn.endCh:
+				atomic.AddInt32(&rn.count, 1)
+				atomic.AddInt64(&rn.bytes, int64(len(xreq.args)))
+				go rn.ProcessReq(xreq)
+			case <-rn.done:
+				return
+			}
 		}
 	}()
 
 	return rn
+}
+
+func (rn *Network) Cleanup() {
+	close(rn.done)
 }
 
 func (rn *Network) Reliable(yes bool) {
@@ -224,6 +251,11 @@ func (rn *Network) ProcessReq(req reqMsg) {
 				replyOK = true
 			case <-time.After(100 * time.Millisecond):
 				serverDead = rn.IsServerDead(req.endname, servername, server)
+				if serverDead {
+					go func() {
+						<-ech // drain channel to let the goroutine created earlier terminate
+					}()
+				}
 			}
 		}
 
@@ -244,9 +276,15 @@ func (rn *Network) ProcessReq(req reqMsg) {
 		} else if longreordering == true && rand.Intn(900) < 600 {
 			// delay the response for a while
 			ms := 200 + rand.Intn(1+rand.Intn(2000))
-			time.Sleep(time.Duration(ms) * time.Millisecond)
-			req.replyCh <- reply
+			// Russ points out that this timer arrangement will decrease
+			// the number of goroutines, so that the race
+			// detector is less likely to get upset.
+			time.AfterFunc(time.Duration(ms)*time.Millisecond, func() {
+				atomic.AddInt64(&rn.bytes, int64(len(reply.reply)))
+				req.replyCh <- reply
+			})
 		} else {
+			atomic.AddInt64(&rn.bytes, int64(len(reply.reply)))
 			req.replyCh <- reply
 		}
 	} else {
@@ -261,8 +299,9 @@ func (rn *Network) ProcessReq(req reqMsg) {
 			// server in fairly rapid succession.
 			ms = (rand.Int() % 100)
 		}
-		time.Sleep(time.Duration(ms) * time.Millisecond)
-		req.replyCh <- replyMsg{false, nil}
+		time.AfterFunc(time.Duration(ms)*time.Millisecond, func() {
+			req.replyCh <- replyMsg{false, nil}
+		})
 	}
 
 }
@@ -325,6 +364,16 @@ func (rn *Network) GetCount(servername interface{}) int {
 
 	svr := rn.servers[servername]
 	return svr.GetCount()
+}
+
+func (rn *Network) GetTotalCount() int {
+	x := atomic.LoadInt32(&rn.count)
+	return int(x)
+}
+
+func (rn *Network) GetTotalBytes() int64 {
+	x := atomic.LoadInt64(&rn.bytes)
+	return x
 }
 
 //
@@ -431,7 +480,7 @@ func (svc *Service) dispatch(methname string, req reqMsg) replyMsg {
 
 		// decode the argument.
 		ab := bytes.NewBuffer(req.args)
-		ad := gob.NewDecoder(ab)
+		ad := labgob.NewDecoder(ab)
 		ad.Decode(args.Interface())
 
 		// allocate space for the reply.
@@ -445,7 +494,7 @@ func (svc *Service) dispatch(methname string, req reqMsg) replyMsg {
 
 		// encode the reply.
 		rb := new(bytes.Buffer)
-		re := gob.NewEncoder(rb)
+		re := labgob.NewEncoder(rb)
 		re.EncodeValue(replyv)
 
 		return replyMsg{true, rb.Bytes()}
