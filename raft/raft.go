@@ -18,6 +18,8 @@ package raft
 //
 
 import (
+	"6.824-lab/labgob"
+	"bytes"
 	"math/rand"
 	"sort"
 	"sync"
@@ -127,13 +129,15 @@ func (rf *Raft) GetState() (int, bool) {
 //
 func (rf *Raft) persist() {
 	// Your code here (2C).
-	// Example:
-	// w := new(bytes.Buffer)
-	// e := labgob.NewEncoder(w)
-	// e.Encode(rf.xxx)
-	// e.Encode(rf.yyy)
-	// data := w.Bytes()
-	// rf.persister.SaveRaftState(data)
+	w := new(bytes.Buffer)
+
+	e:= labgob.NewEncoder(w)
+	e.Encode(rf.CurrentTerm)
+	e.Encode(rf.VotedFor)
+	e.Encode(rf.Logs)
+
+	data := w.Bytes()
+	rf.persister.SaveRaftState(data)
 }
 
 //
@@ -144,18 +148,12 @@ func (rf *Raft) readPersist(data []byte) {
 		return
 	}
 	// Your code here (2C).
-	// Example:
-	// r := bytes.NewBuffer(data)
-	// d := labgob.NewDecoder(r)
-	// var xxx
-	// var yyy
-	// if d.Decode(&xxx) != nil ||
-	//    d.Decode(&yyy) != nil {
-	//   error...
-	// } else {
-	//   rf.xxx = xxx
-	//   rf.yyy = yyy
-	// }
+	r := bytes.NewBuffer(data)
+
+	d:= labgob.NewDecoder(r)
+	d.Decode(&rf.CurrentTerm)
+	d.Decode(&rf.VotedFor)
+	d.Decode(&rf.Logs)
 }
 
 //
@@ -242,6 +240,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 			}
 		}
 	}
+	rf.persist()
 }
 
 // should be called when holding the lock
@@ -428,6 +427,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 				rf.me, rf, args.LeaderID, args.PrevLogIndex, preLogIdx, args.PrevLogTerm, preLogTerm)
 		}
 	}
+	rf.persist()
 }
 
 //
@@ -472,6 +472,7 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 			// only update leader
 			rf.nextIndex[rf.me] = index + 1
 			rf.matchIndex[rf.me] = index
+			rf.persist()
 		}
 	}
 
@@ -557,6 +558,7 @@ func (rf *Raft) consistencyCheckReplyHandler(n int, reply *AppendEntriesReply) {
 		// found a new leader? turn to follower
 		if rf.state == Leader && reply.CurrentTerm > rf.CurrentTerm {
 			rf.turnToFollow()
+			rf.persist()
 			rf.resetTimer <- struct{}{}
 			DPrintf("[%d-%s]: leader %d found new term (heartbeat resp from peer %d), turn to follower.",
 				rf.me, rf, rf.me, n)
@@ -598,17 +600,17 @@ func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *Ap
 func (rf *Raft) consistencyCheck(n int) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	pre := max(1,rf.nextIndex[n])
+	pre := max(1, rf.nextIndex[n])
 	var args = AppendEntriesArgs{
 		Term:         rf.CurrentTerm,
 		LeaderID:     rf.me,
 		PrevLogIndex: pre - 1,
-		PrevLogTerm:  rf.Logs[pre - 1].Term,
+		PrevLogTerm:  rf.Logs[pre-1].Term,
 		Entries:      nil,
 		LeaderCommit: rf.commitIndex,
 	}
 
-	if rf.nextIndex[n] < len(rf.Logs){
+	if rf.nextIndex[n] < len(rf.Logs) {
 		args.Entries = append(args.Entries, rf.Logs[pre:]...)
 	}
 
@@ -681,7 +683,7 @@ func (rf *Raft) canvassVotes() {
 			if reply.CurrentTerm > voteArgs.Term {
 				rf.CurrentTerm = reply.CurrentTerm
 				rf.turnToFollow()
-				//rf.persist()
+				rf.persist()
 				rf.resetTimer <- struct{}{} // reset timer
 				return
 			}
@@ -690,7 +692,7 @@ func (rf *Raft) canvassVotes() {
 					rf.state = Leader
 					rf.resetOnElection()    // reset leader state
 					go rf.heartbeatDaemon() // new leader, start heartbeat daemon
-					DPrintf("[%d-%s]: peer %d become new leader.\n", rf.me, rf, rf.me)
+					DPrintf("[%d-%s]: peer %d become new leader logs:%v.\n", rf.me, rf, rf.me,rf.Logs)
 					return
 				}
 				votes++

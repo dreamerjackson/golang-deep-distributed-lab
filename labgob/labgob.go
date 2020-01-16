@@ -7,10 +7,12 @@ package labgob
 // about non-capitalized field names.
 //
 
-import "encoding/gob"
+import (
+	"encoding/gob"
+	"fmt"
+)
 import "io"
 import "reflect"
-import "fmt"
 import "sync"
 import "unicode"
 import "unicode/utf8"
