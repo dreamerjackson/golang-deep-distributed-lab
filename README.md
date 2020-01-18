@@ -112,6 +112,9 @@ raft使用一种更简单的方式来解决这个难题，raft为leader添加了
 * [raft论文](http://nil.csail.mit.edu/6.824/2017/papers/raft-extended.pdf)
 * [raft可视化](http://thesecretlivesofdata.com/raft/)
 * [知乎，写得一般但是有借鉴地方](https://zhuanlan.zhihu.com/p/32052223)
+* 阅读[raft理论与实践[2]-lab2a](doc/raft-2.md)
+* 阅读[raft理论与实践[3]-lab2a讲解](doc/raft-3.md)
+* 阅读[raft理论与实践[4]-lab2b日志复制](doc/raft-4.md)
 
 ## 技术交流群
     * QQ群：713385260
