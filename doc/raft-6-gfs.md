@@ -7,7 +7,7 @@
 
 ## 为什么阅读GFS的论文
 * GFS使用了map/reduce的架构
-* 好的性能 ++ 良好的并行I/O性能
+* 好的性能 & 良好的并行I/O性能
 * 其实一篇好的系统论文 ++ 从apps到网络都有细节说明
 * 包含分布式的许多概念：performance, fault-tolerance, consistency
 * 使用广泛（Bigtable、Spanner、Hadoop）
@@ -129,7 +129,7 @@ master失败会导致GFS不可用，shadow master会服务只读的状态。可�
 * 则主服务器会首先创建一个副本，以便客户端可以更新副本（而不是快照的一部分）。
 
 ## 参考资料
-* [my blog](https://dreamerjonson.com/2019/12/29/golang-110-lab-raft/)
+* [my blog](https://dreamerjonson.com/2020/01/21/distributed-systerm-2-GFS/)
 
 ## 技术交流群
     * QQ群：713385260
