@@ -27,19 +27,19 @@
 * 如果两个应用程序同时写入同一目录怎么办
   — 在单机，使用了锁。一个应用程序处理完毕后，再处理第二个。
 * 挑战
-  — 多磁盘
-  — 机器故障，操作无法完成。
-  — 网络分区，可能不能够到达所有的机器和磁盘。
+    — 多磁盘
+    — 机器故障，操作无法完成。
+    — 网络分区，可能不能够到达所有的机器和磁盘。
 * 挑战难以解决的原因
   — 需要客户端和服务器之间的通信
   — 协议可能会变得复杂
 
 ## 不同的模型考虑不同的权衡
-— 可串行性(serializability)
-— 顺序一致性(sequential consistency)
-— 线性一致性(linearizability)
-— 单项一致性模型(entry consistency)
-— 松散一致性(release consistency)
+    — 可串行性(serializability)
+    — 顺序一致性(sequential consistency)
+    — 线性一致性(linearizability)
+    — 单项一致性模型(entry consistency)
+    — 松散一致性(release consistency)
 
 ## GFS的目标
 * GFS中节点失效就是常见的（每天1000台机器中大约3台失效）
