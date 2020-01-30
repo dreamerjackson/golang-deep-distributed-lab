@@ -161,5 +161,5 @@ Backup:
     * GFS使用应用程序级复制，与lab2相似。
 
 ## 参考资料
-[讲义](https://pdos.csail.mit.edu/6.824/notes/l-vm-ft.txt)
-[FAQ](https://pdos.csail.mit.edu/6.824/papers/vm-ft-faq.txt)
+*[讲义](https://pdos.csail.mit.edu/6.824/notes/l-vm-ft.txt)
+*[FAQ](https://pdos.csail.mit.edu/6.824/papers/vm-ft-faq.txt)
