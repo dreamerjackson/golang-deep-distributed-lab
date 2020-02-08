@@ -1,5 +1,5 @@
 # lab2a实验讲解
-1、raft.go 的raft结构体 补充字段。 字段应该尽量与raft论文的Figure2接近。
+*  1、raft.go 的raft结构体 补充字段。 字段应该尽量与raft论文的Figure2接近。
 ```go
 type Raft struct {
 	mu        sync.Mutex          // Lock to protect shared access to this peer's state
@@ -123,7 +123,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 ```
 
 ## 修改make
-除了一些基本的初始化过程,新开了一个goroutine。
+*  除了一些基本的初始化过程,新开了一个goroutine。
 ```
 func Make(peers []*labrpc.ClientEnd, me int,
 	persister *Persister, applyCh chan ApplyMsg) *Raft {
