@@ -100,10 +100,10 @@
 * [raft论文](http://nil.csail.mit.edu/6.824/2017/papers/raft-extended.pdf)
 * [raft可视化](http://thesecretlivesofdata.com/raft/)
 * [知乎，写得一般但是有借鉴地方](https://zhuanlan.zhihu.com/p/32052223)
-* 阅读[raft理论与实践[2]-lab2a](doc/raft-2.md)
-* 阅读[raft理论与实践[3]-lab2a讲解](doc/raft-3.md)
-* 阅读[raft理论与实践[4]-lab2b日志复制](doc/raft-4.md)
-* 阅读[raft理论与实践[5]-lab2c持久化](doc/raft-5.md)
+* 阅读[raft理论与实践[2]-lab2a](https://zhuanlan.zhihu.com/p/102948740)
+* 阅读[raft理论与实践[3]-lab2a讲解](https://zhuanlan.zhihu.com/p/103223270)
+* 阅读[raft理论与实践[4]-lab2b日志复制](https://zhuanlan.zhihu.com/p/103386687)
+* 阅读[raft理论与实践[5]-lab2c持久化](https://zhuanlan.zhihu.com/p/103473049)
 
 ## 技术交流群
-    * QQ群：713385260
+     QQ群：713385260
