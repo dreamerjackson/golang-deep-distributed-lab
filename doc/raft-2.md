@@ -1,9 +1,9 @@
 
 ## 准备工作
-*  1、阅读[raft论文](http://nil.csail.mit.edu/6.824/2017/papers/raft-extended.pdf)
-*  2、阅读我写的[raft理论与实践[1]-理论篇](https://dreamerjonson.com/2019/12/29/golang-110-lab-raft/)
-*  3、由于我们需要模拟rpc远程调用， 因此需要查看我写的这篇文章： [模拟RPC远程过程调用](https://dreamerjonson.com/2019/12/25/golang-109-lab-simulate-rpc/)
-*  4、实验开始，我们首先需要拉取代码：
+*  阅读[raft论文](http://nil.csail.mit.edu/6.824/2017/papers/raft-extended.pdf)
+*  阅读我写的[raft理论与实践[1]-理论篇](https://zhuanlan.zhihu.com/p/102023809)
+*  由于我们需要模拟rpc远程调用， 因此需要查看我写的这篇文章： [模拟RPC远程过程调用](https://dreamerjonson.com/2019/12/25/golang-109-lab-simulate-rpc/)
+*  实验开始，我们首先需要拉取代码：
 ```
 git clone git@github.com:dreamerjackson/golang-deep-distributed-lab.git
 git checkout --hard   4e6446c

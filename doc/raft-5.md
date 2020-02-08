@@ -1,15 +1,15 @@
 # golang[114]-raft理论与实践[5]-lab2c-持久化
 ## 准备工作
-1、阅读[raft论文](http://nil.csail.mit.edu/6.824/2017/papers/raft-extended.pdf)
-2、阅读[raft理论与实践[1]-理论篇](https://dreamerjonson.com/2019/12/29/golang-110-lab-raft/)
-3、阅读[raft理论与实践[2]-lab2a](https://dreamerjonson.com/2020/01/06/golang-111-raft-2/)
-4、阅读[raft理论与实践[3]-lab2a讲解](https://dreamerjonson.com/2020/01/06/golang-111-raft-3-elect/)
-5、阅读[raft理论与实践[4]-lab2b日志复制](https://dreamerjonson.com/2020/01/12/golang-113-raft-4-log/)
-6、查看我写的这篇文章： [模拟RPC远程过程调用](https://dreamerjonson.com/2019/12/25/golang-109-lab-simulate-rpc/)
+*  阅读[raft论文](http://nil.csail.mit.edu/6.824/2017/papers/raft-extended.pdf)
+*  阅读我写的[raft理论与实践[1]-理论篇](https://zhuanlan.zhihu.com/p/102023809)
+*  阅读[raft理论与实践[2]-lab2a](https://zhuanlan.zhihu.com/p/102948740)
+*  阅读[raft理论与实践[3]-lab2a讲解](https://zhuanlan.zhihu.com/p/103223270)
+*  阅读[raft理论与实践[4]-lab2b日志复制](https://zhuanlan.zhihu.com/p/103386687)
+*  由于我们需要模拟rpc远程调用， 因此需要查看我写的这篇文章： [模拟RPC远程过程调用](https://dreamerjonson.com/2019/12/25/golang-109-lab-simulate-rpc/)
 
 ## 持久化
 * 如果基于Raft的服务器重新启动，则应从中断的位置恢复服务。 这就要求Raft保持持久状态，使其在重启后仍然有效。
-* 论文中Figure 2指出了那些字段需要持久化。
+* 论文中Figure 2指出了哪些字段需要持久化。
 * 并且raft.go包含有关如何保存和恢复持久性状态的示例。
 
 * 一个“真实的服务在每次Raft更改状态时将Raft的持久状态写入磁盘，并在重新启动时从磁盘读取最新的状态来恢复。
@@ -21,10 +21,10 @@
 
 * 在本实验中，我们需要完善在raft.go中的persist() and readPersist()方法。
 * 需要使用到labgob包中的编码与解码函数。
-* 你需要明确在什么时候需要持久化。
+* 读者需要明确在什么时候需要持久化。
 
 
-下面只列出两个重要实现，其他不再赘述，留给读者自己实现。
+下面只列出两个重要序列化的实现，其他不再赘述，留给读者自己实现。
 ## 持久化编码
 ```go
 func (rf *Raft) persist() {
@@ -63,4 +63,5 @@ func (rf *Raft) readPersist(data []byte) {
 ```
 
 ## 参考资料
-https://github.com/dreamerjackson/golang-deep-distributed-lab
+* [项目链接](https://github.com/dreamerjackson/golang-deep-distributed-lab)
+

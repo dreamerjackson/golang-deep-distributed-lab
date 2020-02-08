@@ -1,5 +1,12 @@
 # lab2a实验讲解
-*  1、raft.go 的raft结构体 补充字段。 字段应该尽量与raft论文的Figure2接近。
+
+## 准备工作
+*  阅读[raft论文](http://nil.csail.mit.edu/6.824/2017/papers/raft-extended.pdf)
+*  阅读我写的[raft理论与实践[1]-理论篇](https://zhuanlan.zhihu.com/p/102023809)
+*  阅读[raft理论与实践[2]-lab2a](https://zhuanlan.zhihu.com/p/102948740)
+*  由于我们需要模拟rpc远程调用， 因此需要查看我写的这篇文章： [模拟RPC远程过程调用](https://dreamerjonson.com/2019/12/25/golang-109-lab-simulate-rpc/)
+
+*  raft.go 的raft结构体 补充字段。 字段应该尽量与raft论文的Figure2接近。
 ```go
 type Raft struct {
 	mu        sync.Mutex          // Lock to protect shared access to this peer's state
@@ -48,7 +55,7 @@ func (rf *Raft) GetState() (int, bool) {
 }
 ```
 
-## 2、填充RequestVoteArgs和RequestVoteReply结构。
+## 填充RequestVoteArgs和RequestVoteReply结构。
 
 ```
 type RequestVoteArgs struct {
@@ -68,11 +75,11 @@ type RequestVoteReply struct {
 
 
 ## 实现RPC方法RequestVote
-* 1、获取当前节点的log个数，以及最后一个log的term 确定当前节点的term。
-* 2、如果调用节点的term小于当前节点，返回当前term，并且不为其投票。
-* 3、如果调用节点的term大于当前节点，修改当前节点的term，当前节点转为follower.
-* 4、如果调用节点的term大于当前节点，或者等于当前节点term并且调用节点的log个数大于等于当前节点的log，则为调用节点投票。
-* 5、投票后重置当前节点的选举超时时间。
+* 获取当前节点的log个数，以及最后一个log的term 确定当前节点的term。
+* 如果调用节点的term小于当前节点，返回当前term，并且不为其投票。
+* 如果调用节点的term大于当前节点，修改当前节点的term，当前节点转为follower.
+* 如果调用节点的term大于当前节点，或者等于当前节点term并且调用节点的log个数大于等于当前节点的log，则为调用节点投票。
+* 投票后重置当前节点的选举超时时间。
 ```
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
@@ -291,7 +298,10 @@ func (rf *Raft) consistencyCheck(n int) {
 ```
 
 
-
+## AppendEntries
+* AppendEntries用在两个方面
+    + 心跳检测
+    + log 同步
 ```
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	select {
@@ -338,7 +348,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 ```
 
 ## 处理心跳检测返回
-如果心跳检测失败了，那么变为follower，重置选举超时。
+* 如果心跳检测失败了，那么leader变为follower，重置选举超时。
 ```
 // n: which follower
 func (rf *Raft) consistencyCheckReplyHandler(n int, reply *AppendEntriesReply) {

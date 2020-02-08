@@ -1,14 +1,13 @@
-# golang[113]-raft理论与实践[4]-lab2b日志复制
+# golang[113]-raft理论与实践[4]-lab2b日志同步
 ## 准备工作
-*  1、阅读[raft论文](http://nil.csail.mit.edu/6.824/2017/papers/raft-extended.pdf)
-*  2、阅读[raft理论与实践[1]-理论篇](https://dreamerjonson.com/2019/12/29/golang-110-lab-raft/)
-*  3、阅读[raft理论与实践[2]-lab2a](https://dreamerjonson.com/2020/01/06/golang-111-raft-2/)
-*  4、阅读[raft理论与实践[3]-lab2a讲解](https://dreamerjonson.com/2020/01/06/golang-111-raft-3-elect/)
-*  5、查看我写的这篇文章： [模拟RPC远程过程调用](https://dreamerjonson.com/2019/12/25/golang-109-lab-simulate-rpc/)
+*  阅读[raft论文](http://nil.csail.mit.edu/6.824/2017/papers/raft-extended.pdf)
+*  阅读我写的[raft理论与实践[1]-理论篇](https://zhuanlan.zhihu.com/p/102023809)
+*  阅读[raft理论与实践[2]-lab2a](https://zhuanlan.zhihu.com/p/102948740)
+*  阅读[raft理论与实践[3]-lab2a讲解](https://zhuanlan.zhihu.com/p/103223270)
+*  由于我们需要模拟rpc远程调用， 因此需要查看我写的这篇文章： [模拟RPC远程过程调用](https://dreamerjonson.com/2019/12/25/golang-109-lab-simulate-rpc/)
 
 ## 执行日志
-我们需要执行日志中的命令，因此在make函数中，新开一个协程:applyLogEntryDaemon()
-
+* 我们需要执行日志中的命令，因此在make函数中，新开一个协程:applyLogEntryDaemon()
 
 ```go
 
@@ -22,10 +21,9 @@ func Make(peers []*labrpc.ClientEnd, me int,
 }
 ```
 
-*  一个死循环如下
-*  1、如果rf.lastApplied == rf.commitIndex, 意味着commit log entry命令都已经被执行了，这时用信号量陷入等待。
+*  如果rf.lastApplied == rf.commitIndex, 意味着commit log entry命令都已经被执行了，这时用信号量陷入等待。
 *  一旦收到信号，说明需要执行命令。这时会把最后执行的log entry之后，一直到最后一个commit log entry的所有log都传入通道apply中进行执行。
-由于是测试，处理apply的逻辑会在测试代码中。
+* 由于是测试，处理log的逻辑会在测试代码中，暂时不用关心
 
 ```
 // applyLogEntryDaemon exit when shutdown channel is closed
@@ -109,8 +107,9 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 }
 ```
 
-* 接下来最重要的部分涉及到日志复制，这是通过AppendEntries实现的。我们知道leader会不时的调用consistencyCheck(n)进行一致性检查。
-* 在给第n号节点一致性检查时，首先获取pre = rf.nextIndex，pre至少要为1。代表要给n节点发送的log index。因此AppendEntriesArgs参数中，PrevLogIndex 与 prevlogTerm 都为pre - 1位置。
+* 接下来最重要的部分涉及到日志同步，这是通过AppendEntries实现的。我们知道leader会不时的调用consistencyCheck(n)进行一致性检查。
+* 在给第n号节点一致性检查时，首先获取pre = rf.nextIndex，pre至少要为1，代表要给n节点发送的log index。
+* 因此AppendEntriesArgs参数中，PrevLogIndex 与 prevlogTerm 都为pre - 1位置，
 * 代表leader相信PrevLogIndex及其之前的节点都是与leader相同的。
 * 将pre及其之后的entry 加入到AppendEntriesArgs参数中。 这些log entry可能是与leader不相同的，或者是follower根本就没有的。
 
@@ -249,12 +248,12 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 ```
 
 * leader调用AppendEntries后，会执行回调函数consistencyCheckReplyHandler。
-* 如果调用是成功的，那么正常的跟新matchIndex，nextIndex即下一个要发送的index应该为matchIndex + 1。
+* 如果调用是成功的，那么正常的更新matchIndex，nextIndex即下一个要发送的index应该为matchIndex + 1。
 * 如果调用失败，说明有冲突。
 * 如果confiicting term等于0，说明了leader认为的match log entry超出了follower的log个数，或者follower 还没有任何log entry（除了index为0的entry是每一个节点都有的）。
 * 此时简单的让nextIndex 为reply.FirstIndex即可。
 
-* 如果confiicting term不为0，获取leader节点confiicting term 的最后一个log index，此时nextIndex 应该为此index与reply.FirstIndex的最小值。
+* 如果conficting term不为0，获取leader节点confiicting term 的最后一个log index，此时nextIndex 应该为此index与reply.FirstIndex的最小值。
 * 检查最小值是必须的：
 * 假设
 * s1: 0-0 1-1 1-2 1-3 1-4 1-5
@@ -335,7 +334,7 @@ func (rf *Raft) consistencyCheckReplyHandler(n int, reply *AppendEntriesReply) {
 * 1、在其term周期内，就复制到大多数。
 * 2、如果随后的entry被提交。在上例中，如果s1持续成为term4的leader，那么entry2就会成为commit。
 
-*这是由于以下原因造成的：更高任期为最新的投票规则，以及leader将其日志强加给follower。
+* 这是由于以下原因造成的：更高任期为最新的投票规则，以及leader将其日志强加给follower。
 
 ```
 // updateCommitIndex find new commit id, must be called when hold lock
