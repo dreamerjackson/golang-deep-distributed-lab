@@ -25,14 +25,14 @@ git checkout --hard   4e6446c
 * 4、确保不同对等方的选举超时不会总是同时触发，否则所有节点都只会为自己投票，而没有人会成为领导者。
 * 5、测试要求leader每秒发送心跳RPC的次数不得超过十次。
 * 6、测试要求在leader失败后，也能够再5秒之内选出新的leader。 您必须选择足够短的选举超时时间（以及因此产生的心跳间隔），
- - 以使选举很有可能在不到五秒钟的时间内完成，即使需要进行多轮选举也是如此。
+    + 以使选举很有可能在不到五秒钟的时间内完成，即使需要进行多轮选举也是如此。
 * 7、raft论文的5.2提到选举超时的范围是150到300毫秒，但是仅当领导者发送心跳的频率大大超过每150毫秒一次的频率时，此范围才有意义。
- - 由于测试要求您的心跳检测为每秒10个，因此您将必须使用大于150到300毫秒的选举超时时间，但不能太大，因为那样的话，您可能会在五秒钟内无法选举领导者。
+    + 由于测试要求您的心跳检测为每秒10个，因此您将必须使用大于150到300毫秒的选举超时时间，但不能太大，因为那样的话，您可能会在五秒钟内无法选举领导者。
 * 8、使用go的rand方法产生随机数。
 * 9、go的time.Timer 和 time.Ticker 很难使用正确。
 * 10、要调试代码，可以将util.go 的debug设置为1.
 * 11、您应该使用go test -race检查代码，并修复它报告的所有问题。
 
 ## 参考
-[讲义](https://github.com/dreamerjackson/Distributed-Systems/blob/master/Lec05_Fault_Tolerance_Raft/l-raft.txt)
-[讲义新](https://pdos.csail.mit.edu/6.824/notes/l-raft.txt)
+* [讲义](https://github.com/dreamerjackson/Distributed-Systems/blob/master/Lec05_Fault_Tolerance_Raft/l-raft.txt)
+* [讲义新](https://pdos.csail.mit.edu/6.824/notes/l-raft.txt)
