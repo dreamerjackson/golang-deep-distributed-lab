@@ -299,9 +299,9 @@ func (rf *Raft) consistencyCheck(n int) {
 
 
 ## AppendEntries
-* AppendEntries用在两个方面
-    + 心跳检测
-    + log 同步
+AppendEntries用在两个方面
+* 心跳检测
+* log 同步
 ```
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	select {
@@ -348,7 +348,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 ```
 
 ## 处理心跳检测返回
-* 如果心跳检测失败了，那么leader变为follower，重置选举超时。
+* 如果心跳检测失败了，那么leader变为follower，重置选举超时时间
 ```
 // n: which follower
 func (rf *Raft) consistencyCheckReplyHandler(n int, reply *AppendEntriesReply) {
