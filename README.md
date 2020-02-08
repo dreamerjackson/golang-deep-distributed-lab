@@ -61,8 +61,8 @@
 ![Gopher image](picture/1.png)
 * 如图所示，我们可以把log 理解为entry的集合。在entry中包含了common命令、entry所在的term 以及每一个entry的顺序编号index。
 * raft的一致性保证了下面的属性：
-    + 如果在不同节点中log中的entry有相同的index 和term。 那么一定存储的是相同的command。
-    + 如果在不同节点中log中的entry有相同的index 和term。 那么此entry之前的所有entry都是相同的。
+    + 如果在不同节点中log中的entry有相同的index 和term, 那么一定存储的是相同的command。
+    + 如果在不同节点中log中的entry有相同的index 和term,那么此entry之前的所有entry都是相同的。
 
 ![leader crashes](picture/2.png)
 * 节点f可能会发生，如果其是term 2的leader, 添加entry到log中，但是没有commit时就奔溃了，其快速恢复后又变为了term 3 的leader， 添加entry到log中，没有commit又继续奔溃了。
