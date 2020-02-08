@@ -19,10 +19,10 @@
 * 其他服务器会执行此log，即会执行此命令。最后，所有的服务器都会到达同一个状态。
 
 * 分布式共识算法必须满足下面的属性：
-    + 在极端情况下（丢包、奔溃）任然能够保证安全性。
-    + 大多数节点正常的情况下能够保证可用。
-    + 不能依靠时间戳去保证log的一致性,因为时间戳是不准确的,特别是在对时间要求很敏感的地方
-    + 当大部分的节点通过RPC远程调用交流 达成共识后，command就可以被确认和执行。小部分节点的不稳定不会影响整个系统。
+    + 在极端情况下（丢包、奔溃）任然能够保证安全性
+    + 大多数节点正常的情况下能够保证可用
+    + 不能依靠时间戳去保证log的一致性,因为时间戳是不准确的,特别是时间的微小变化受到很多扰动
+    + 当大部分的节点通过RPC远程调用交流 达成共识后，command就可以被确认和执行。小部分节点的不稳定不会影响整个系统
 
 ## raft basic
 * raft集群一般保持奇数个数量（5个节点比较普遍). 从而只要大部分节点存活，即可用。
@@ -42,8 +42,7 @@
 ## 选举
 * 在raft中会有一套心跳检测，只要follower收到来自leader或者Candidates的数据，那么其会保持follower的状态。
 * 如果follower一段时间内没有收到RPC请求，这意味着选举超时（ election timeout ）。
-* 这时follower会将current term 加1，过渡到Candidates状态。
-* 其会给自己投票，并发送RequestVote RPC请求给其他的节点，拉票！
+* 这时follower会将current term 加1，过渡到Candidates状态。其会给自己投票，并发送RequestVote RPC请求给其他的节点，拉票！
 
 * Candidates状态会持续，直到下面的3种情况发生:
     + 当其获得了大部分节点的支持后，其赢得了选举，变为了leader。一旦其变为了leader，其会向其他节点发送 AppendEntries RPC， 确认其leader的地位，阻止选举。
@@ -51,7 +50,7 @@
     + 一段时间过去任然没有参与者。
 * 如果有许多的节点同时变为了candidate,则可能会出现一段时间内都没有节点能够选举成功的情况。
 * 在raft中，为了快速解决并修复这个问题，规定了每一个candidate在选举前会重置一个随机的选举超时（ election timeout ）时间，此随机时间会在一个区间内（eg.150-300ms）
-* 这样保证了，在大部分的情况下，有一个唯一的节点首先选举超时，其在大部分节点选举超时前发送心跳检测，赢得了选举。
+* 随机时间保证了在大部分的情况下，有一个唯一的节点首先选举超时，其在大部分节点选举超时前发送心跳检测，赢得了选举。
 * 当一个leader在心跳检测中发现另一个节点有更高的term时，会转变为follower。否则其将一直保持leader状态。
 ## 日志复制(Log replication)
 * 当成为leader后，其会接受来自客户端的请求。每一个客户端请求都包含一个将要被节点的状态机执行的command。
@@ -75,8 +74,8 @@
 ## 安全性
 * 上面的属性还不能够充分的保证系统的安全性。 考虑下面的例子：
 ![safe problem](picture/3.png)
-* 上图要说明的是，一个已经被commit的entry 在目前的情况下是有可能被覆盖掉的。例如在a
-* 阶段s1成为了leader，其entry还没有commit。 在b阶段,s1奔溃，s5成为了leader ，添加log但是任然没有commit。 在c阶段，s5奔溃，s1成为了leader。其entry成为了commit。 在d阶段s1奔溃，s5成为了leader，其会将本已commit的entry给覆盖掉。
+* 上图要说明的是，一个已经被commit的entry 在目前的情况下是有可能被覆盖掉的。
+* 例如在a阶段s1成为了leader，其entry还没有commit。 在b阶段,s1奔溃，s5成为了leader ，添加log但是任然没有commit。 在c阶段，s5奔溃，s1成为了leader。其entry成为了commit。 在d阶段s1奔溃，s5成为了leader，其会将本已commit的entry给覆盖掉。
 
 * raft使用一种更简单的方式来解决这个难题，raft为leader添加了限制:
     + 要成为leader 必须要包含过去所有的commit entry。
