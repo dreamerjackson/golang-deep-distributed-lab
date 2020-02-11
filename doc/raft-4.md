@@ -166,7 +166,7 @@ type AppendEntriesReply struct {
 
 * 否则说明leader与follower的日志是有冲突的，冲突的原因可能是：
     + leader认为的match log entry超出了follower的log个数，或者follower 还没有任何log entry（除了index为0的entry是每一个节点都有的）。
-    + log在相同的index下，leader的term 与follower的term确是不同的。
+    + log在相同的index下，leader的term 与follower的term却是不同的。
 * 这时找到follower冲突的term即为ConflictTerm。
 * 获取此term的第一个entry的index即为FirstIndex。
 * 所以最后，AppendEntries会返回冲突的term以及第一个可能冲突的index。

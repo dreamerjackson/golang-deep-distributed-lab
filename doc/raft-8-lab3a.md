@@ -1,11 +1,12 @@
 # golang[114]-raft理论与实践[6]-lab3a-基于raft构建分布式容错kv服务
 ## 准备工作
-* 1、阅读[raft论文](http://nil.csail.mit.edu/6.824/2017/papers/raft-extended.pdf)
-* 2、阅读[raft理论与实践[1]-理论篇](https://zhuanlan.zhihu.com/p/102023809)
-* 3、阅读[raft理论与实践[2]-lab2a]()
-* 4、阅读[raft理论与实践[3]-lab2a讲解]()
-* 5、阅读[raft理论与实践[4]-lab2b日志复制]()
-* 6、查看我写的这篇文章： [模拟RPC远程过程调用]()
+*  阅读[raft论文](http://nil.csail.mit.edu/6.824/2017/papers/raft-extended.pdf)
+*  阅读[raft理论与实践[1]-理论篇](https://zhuanlan.zhihu.com/p/102023809)
+*  阅读[raft理论与实践[2]-lab2a](https://zhuanlan.zhihu.com/p/102948740)
+*  阅读[raft理论与实践[3]-lab2a讲解](https://zhuanlan.zhihu.com/p/103223270)
+*  阅读[raft理论与实践[4]-lab2b日志复制](https://zhuanlan.zhihu.com/p/103386687)
+*  阅读[raft理论与实践[5]-lab2c日志复制](https://zhuanlan.zhihu.com/p/103473049)
+*  阅读[模拟RPC远程过程调用](https://dreamerjonson.com/2019/12/25/golang-109-lab-simulate-rpc/)
 
 ## 前言
 * 在之前的文章中，我们实现了raft算法的基本框架
@@ -163,10 +164,9 @@ type KVServer struct {
 * 将此command通过`rf.Start(cmd)`  放入raft中
 * `select`等待直到ch被激活
 * ch被激活后,需要再次检测当前节点是否为leader
-    + 如果不是说明leader更换
-    + 立即返回错误
+    + 如果不是,说明leader更换,立即返回错误
     + 这个时候会堵塞直到序号为commandIndex的命令被应用，但是，如果leader更换，此commandIndex的命令不一定就是我们的当前的命令
-    + 但是完全有可能新的leader已经应用了此状态，我们这时候虽然仍然然返回错误，希望客户端重试，这是由于操作是幂等的并且重复操作无影响。
+    + 但是完全有可能新的leader已经应用了此状态，我们这时候虽然仍然返回错误，希望客户端重试，这是由于操作是幂等的并且重复操作无影响。
     + 优化方案是为command指定一个唯一的标识，这样就能够明确此特定操作是否被应用
 ```
 func (kv *KVServer) PutAppend(args *PutAppendArgs, reply *PutAppendReply) {
@@ -275,4 +275,5 @@ func (kv *KVServer) applyDaemon() {
 ```
 
 ## 参考资料
-https://github.com/dreamerjackson/golang-deep-distributed-lab
+* [项目链接](https://github.com/dreamerjackson/golang-deep-distributed-lab)
+* [lab3实验介绍]http://nil.csail.mit.edu/6.824/2020/labs/lab-kvraft.html)
