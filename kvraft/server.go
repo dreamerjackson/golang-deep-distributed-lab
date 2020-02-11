@@ -4,6 +4,8 @@ import (
 	"6.824-lab/labgob"
 	"6.824-lab/labrpc"
 	"6.824-lab/raft"
+	"bytes"
+	"encoding/gob"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -176,8 +178,17 @@ func (kv *KVServer) applyDaemon() {
 			return
 		case msg, ok := <-kv.applyCh:
 			if ok {
+				// have snapshot to apply?
+				if msg.UseSnapshot {
+					kv.mu.Lock()
+					kv.readSnapshot(msg.Snapshot)
+					// must be persisted, in case of crashing before generating another snapshot
+					kv.generateSnapshot(msg.CommandIndex)
+					kv.mu.Unlock()
+					continue
+				}
 				// have client's request? must filter duplicate command
-				if msg.Command != nil {
+				if msg.Command != nil && msg.CommandIndex > kv.snapshotIndex{
 					cmd := msg.Command.(Op)
 					kv.mu.Lock()
 					if dup, ok := kv.duplicate[cmd.ClientID]; !ok || dup.Seq < cmd.SeqNo {
@@ -200,6 +211,15 @@ func (kv *KVServer) applyDaemon() {
 								kv.me, kv.me, msg.CommandIndex, cmd, cmd.ClientID, dup.Seq, cmd.SeqNo)
 						}
 					}
+					// snapshot detection: up through msg.Index
+					if needSnapshot(kv) {
+						// save snapshot and notify raft
+						DPrintf("[%d]: server %d need generate snapshot @ %d (%d vs %d), client: %d.\n",
+							kv.me, kv.me, msg.CommandIndex, kv.maxraftstate, kv.persist.RaftStateSize(), cmd.ClientID)
+						kv.generateSnapshot(msg.CommandIndex)
+						kv.rf.NewSnapShot(msg.CommandIndex)
+					}
+
 					// notify channel
 					if notifyCh, ok := kv.notifyChs[msg.CommandIndex]; ok && notifyCh != nil {
 						close(notifyCh)
@@ -212,6 +232,51 @@ func (kv *KVServer) applyDaemon() {
 	}
 }
 
+
+func needSnapshot(kv *KVServer) bool {
+	if kv.maxraftstate < 0 {
+		return false
+	}
+	if kv.maxraftstate < kv.persist.RaftStateSize() {
+		return true
+	}
+	// abs < 10% of max
+	var abs = kv.maxraftstate - kv.persist.RaftStateSize()
+	var threshold = kv.maxraftstate / 10
+	if abs < threshold {
+		return true
+	}
+	return false
+}
+
+// which index?
+func (kv *KVServer) generateSnapshot(index int) {
+	w := new(bytes.Buffer)
+	e := gob.NewEncoder(w)
+
+	kv.snapshotIndex = index
+
+	e.Encode(kv.db)
+	e.Encode(kv.snapshotIndex)
+	e.Encode(kv.duplicate)
+	data := w.Bytes()
+	kv.persist.SaveSnapshot(data)
+}
+
+func (kv *KVServer) readSnapshot(data []byte) {
+	if data == nil || len(data) < 1 { // bootstrap without any state?
+		return
+	}
+	r := bytes.NewBuffer(data)
+	d := gob.NewDecoder(r)
+
+	kv.db = make(map[string]string)
+	kv.duplicate = make(map[int64]*LatestReply)
+
+	d.Decode(&kv.db)
+	d.Decode(&kv.snapshotIndex)
+	d.Decode(&kv.duplicate)
+}
 
 //
 // the tester calls Kill() when a KVServer instance won't
@@ -267,6 +332,7 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.duplicate = make(map[int64]*LatestReply)
 
 	kv.applyCh = make(chan raft.ApplyMsg)
+	kv.readSnapshot(kv.persist.ReadSnapshot())
 	kv.rf = raft.Make(servers, me, persister, kv.applyCh)
 
 	// You may need initialization code here.
