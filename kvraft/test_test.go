@@ -273,9 +273,9 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 		if maxraftstate > 0 {
 			// Check maximum after the servers have processed all client
 			// requests and had time to checkpoint.
-			sz := cfg.LogSize()
+			sz ,faiIndex:= cfg.LogSizeDebug()
 			if sz > 2*maxraftstate {
-				t.Fatalf("logs were not trimmed (%v > 2*%v)", sz, maxraftstate)
+				t.Fatalf("index:[%d],logs were not trimmed (%v > 2*%v)",faiIndex, sz, maxraftstate)
 			}
 		}
 	}
@@ -404,13 +404,13 @@ func GenericTestLinearizability(t *testing.T, part string, nclients int, nserver
 		for i := 0; i < nclients; i++ {
 			<-clnts[i]
 		}
-
+		time.Sleep(2*time.Second)
 		if maxraftstate > 0 {
 			// Check maximum after the servers have processed all client
 			// requests and had time to checkpoint.
-			sz := cfg.LogSize()
+			sz ,faiIndex:= cfg.LogSizeDebug()
 			if sz > 2*maxraftstate {
-				t.Fatalf("logs were not trimmed (%v > 2*%v)", sz, maxraftstate)
+				t.Fatalf("index:[%d] logs were not trimmed (%v > 2*%v) %v",faiIndex, sz, maxraftstate,cfg.kvservers[faiIndex].Killed())
 			}
 		}
 	}
@@ -674,9 +674,10 @@ func TestSnapshotSize3B(t *testing.T) {
 	}
 
 	// check that servers have thrown away most of their log entries
-	sz := cfg.LogSize()
+	//sz := cfg.LogSize()
+	sz ,faiIndex:= cfg.LogSizeDebug()
 	if sz > 2*maxraftstate {
-		t.Fatalf("logs were not trimmed (%v > 2*%v)", sz, maxraftstate)
+		t.Fatalf("index:[%d],logs were not trimmed (%v > 2*%v)", faiIndex,sz, maxraftstate)
 	}
 
 	// check that the snapshots are not unreasonably large

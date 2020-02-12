@@ -181,6 +181,7 @@ func (kv *KVServer) applyDaemon() {
 				// have snapshot to apply?
 				if msg.UseSnapshot {
 					kv.mu.Lock()
+					kv.snapshotIndex = msg.CommandIndex
 					kv.readSnapshot(msg.Snapshot)
 					// must be persisted, in case of crashing before generating another snapshot
 					kv.generateSnapshot(msg.CommandIndex)
@@ -213,6 +214,7 @@ func (kv *KVServer) applyDaemon() {
 					}
 					// snapshot detection: up through msg.Index
 					if needSnapshot(kv) {
+						kv.snapshotIndex = msg.CommandIndex
 						// save snapshot and notify raft
 						DPrintf("[%d]: server %d need generate snapshot @ %d (%d vs %d), client: %d.\n",
 							kv.me, kv.me, msg.CommandIndex, kv.maxraftstate, kv.persist.RaftStateSize(), cmd.ClientID)
@@ -250,17 +252,32 @@ func needSnapshot(kv *KVServer) bool {
 }
 
 // which index?
-func (kv *KVServer) generateSnapshot(index int) {
+func (kv *KVServer) generateSnapshot(index int) []byte{
 	w := new(bytes.Buffer)
 	e := gob.NewEncoder(w)
-
 	kv.snapshotIndex = index
 
 	e.Encode(kv.db)
 	e.Encode(kv.snapshotIndex)
 	e.Encode(kv.duplicate)
 	data := w.Bytes()
+
+
 	kv.persist.SaveSnapshot(data)
+	return data
+}
+
+func (kv *KVServer) snapshotData() []byte{
+	w := new(bytes.Buffer)
+	e := gob.NewEncoder(w)
+
+
+	e.Encode(kv.db)
+	e.Encode(kv.snapshotIndex)
+	e.Encode(kv.duplicate)
+	data := w.Bytes()
+
+	return data
 }
 
 func (kv *KVServer) readSnapshot(data []byte) {
@@ -294,7 +311,7 @@ func (kv *KVServer) Kill() {
 	// Your code here, if desired.
 }
 
-func (kv *KVServer) killed() bool {
+func (kv *KVServer) Killed() bool {
 	z := atomic.LoadInt32(&kv.dead)
 	return z == 1
 }
@@ -334,7 +351,6 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv.applyCh = make(chan raft.ApplyMsg)
 	kv.readSnapshot(kv.persist.ReadSnapshot())
 	kv.rf = raft.Make(servers, me, persister, kv.applyCh)
-
 	// You may need initialization code here.
 	go kv.applyDaemon()
 

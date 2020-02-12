@@ -3,6 +3,7 @@ package kvraft
 import (
 	"6.824-lab/labrpc"
 	"crypto/rand"
+	"sync"
 	"time"
 )
 import "math/big"
@@ -12,7 +13,7 @@ var clients = make(map[int64]bool)
 type Clerk struct {
 	servers []*labrpc.ClientEnd
 	// You will have to modify this struct.
-
+	lock sync.Mutex
 	leader int   // remember last leader
 	seq    int   // RPC sequence number
 	id     int64 // client id
@@ -69,15 +70,20 @@ func (ck *Clerk) Get(key string) string {
 		args := &GetArgs{Key: key, ClientID: ck.id, SeqNo: ck.seq}
 		reply := new(GetReply)
 
+		ck.lock.Lock()
 		ck.leader %= cnt
+		tmpLeader:= ck.leader
+		ck.lock.Unlock()
 		done := make(chan bool, 1)
 		go func() {
-			ok := ck.servers[ck.leader].Call("KVServer.Get", args, reply)
+			ok := ck.servers[tmpLeader].Call("KVServer.Get", args, reply)
 			done <- ok
 		}()
 		select {
 		case <-time.After(200 * time.Millisecond): // rpc timeout: 200ms
+			ck.lock.Lock()
 			ck.leader++
+			ck.lock.Unlock()
 			continue
 		case ok := <-done:
 			if ok && !reply.WrongLeader {
@@ -87,7 +93,10 @@ func (ck *Clerk) Get(key string) string {
 				}
 				return ""
 			}
+			ck.lock.Lock()
 			ck.leader++
+			ck.lock.Unlock()
+
 		}
 	}
 
@@ -111,23 +120,29 @@ func (ck *Clerk) PutAppend(key string, value string, op string) {
 	for {
 		args := &PutAppendArgs{Key: key, Value: value, Op: op, ClientID: ck.id, SeqNo: ck.seq}
 		reply := new(PutAppendReply)
-
+		ck.lock.Lock()
 		ck.leader %= cnt
+		tmpLeader:= ck.leader
+		ck.lock.Unlock()
 		done := make(chan bool, 1)
 		go func() {
-			ok := ck.servers[ck.leader].Call("KVServer.PutAppend", args, reply)
+			ok := ck.servers[tmpLeader].Call("KVServer.PutAppend", args, reply)
 			done <- ok
 		}()
 		select {
 		case <-time.After(200 * time.Millisecond): // rpc timeout: 200ms
+			ck.lock.Lock()
 			ck.leader++
+			ck.lock.Unlock()
 			continue
 		case ok := <-done:
 			if ok && !reply.WrongLeader && reply.Err == OK {
 				ck.seq++
 				return
 			}
+			ck.lock.Lock()
 			ck.leader++
+			ck.lock.Unlock()
 		}
 	}
 }

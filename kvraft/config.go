@@ -91,6 +91,20 @@ func (cfg *config) LogSize() int {
 	}
 	return logsize
 }
+//for debug
+func (cfg *config) LogSizeDebug() (int,int) {
+	logsize := -1
+	index:= -1
+	for i := 0; i < cfg.n; i++ {
+		n := cfg.saved[i].RaftStateSize()
+		if n > logsize {
+			logsize = n
+			index = i
+		}
+	}
+	return logsize,index
+}
+
 
 // Maximum snapshot size across all servers
 func (cfg *config) SnapshotSize() int {

@@ -117,6 +117,8 @@ func (rf *Raft) NewSnapShot(index int) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	if rf.commitIndex < index || index <= rf.snapshotIndex {
+		DPrintf("[%d-%s]: peer %d NewSnapShot(),commitIndex:%d index:%d.snapshotIndex:%d \n",
+			rf.me, rf, rf.me, rf.commitIndex,index,rf.snapshotIndex)
 		panic("NewSnapShot(): new.snapshotIndex <= old.snapshotIndex")
 	}
 	// including the last of snapshot's log entry as the first log
@@ -128,9 +130,8 @@ func (rf *Raft) NewSnapShot(index int) {
 	DPrintf("[%d-%s]: peer %d have new snapshot, %d @ %d.\n",
 		rf.me, rf, rf.me, rf.snapshotIndex, rf.snapshotTerm)
 	rf.persist()
+	//rf.persister.SaveStateAndSnapshot(snapShotData,rf.stateData())
 }
-
-
 // return currentTerm and whether this server
 // believes it is the leader.
 func (rf *Raft) GetState() (int, bool) {
@@ -165,6 +166,22 @@ func (rf *Raft) persist() {
 	data := w.Bytes()
 	rf.persister.SaveRaftState(data)
 }
+
+func (rf *Raft) stateData() []byte{
+	// Your code here (2C).
+	w := new(bytes.Buffer)
+
+	e:= labgob.NewEncoder(w)
+	e.Encode(rf.CurrentTerm)
+	e.Encode(rf.VotedFor)
+	e.Encode(rf.Logs)
+	e.Encode(rf.snapshotIndex)
+	e.Encode(rf.snapshotTerm)
+
+	data := w.Bytes()
+	return data
+}
+
 
 //
 // restore previously persisted state.
@@ -237,8 +254,10 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 	lastLogIdx, lastLogTerm := rf.lastLogIndexAndTerm()
 
-	DPrintf("[%d-%s]: rpc RV, from peer: %d, arg term: %d, my term: %d (last log idx: %d->%d, term: %d->%d)\n", rf.me, rf, args.CandidateID, args.Term, rf.CurrentTerm, args.LastLogIndex,
-		lastLogIdx, args.LastLogTerm, lastLogTerm)
+	DPrintf("[%d-%s]: rpc RV, from peer: %d, arg term: %d, my term: %d (last log idx: %d->%d, term: %d->%d),"+
+		" snapshot: %d @ %d\n", rf.me, rf, args.CandidateID, args.Term, rf.CurrentTerm, args.LastLogIndex,
+		lastLogIdx, args.LastLogTerm, lastLogTerm, rf.snapshotIndex, rf.snapshotTerm)
+
 
 	if args.Term < rf.CurrentTerm {
 		reply.CurrentTerm = rf.CurrentTerm
@@ -522,8 +541,7 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 		rf.Logs = []LogEntry{{rf.snapshotTerm, nil}}
 
 		rf.applyCh <- ApplyMsg{true,nil, rf.snapshotIndex, true, args.Snapshot}
-
-		rf.persist()
+		rf.persister.SaveStateAndSnapshot(rf.stateData(),args.Snapshot)
 		return
 	}
 
@@ -539,7 +557,7 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 
 	rf.applyCh <- ApplyMsg{true,nil,rf.snapshotIndex,  true, args.Snapshot}
 
-	rf.persist()
+	rf.persister.SaveStateAndSnapshot(rf.stateData(),args.Snapshot)
 }
 
 func (rf *Raft) sendInstallSnapshot(server int, args *InstallSnapshotArgs, reply *InstallSnapshotReply) bool {
@@ -609,6 +627,8 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 func (rf *Raft) Kill() {
 	atomic.StoreInt32(&rf.dead, 1)
 	// Your code here, if desired.
+	close(rf.shutdownCh)
+	rf.commitCond.Broadcast()
 }
 
 func (rf *Raft) killed() bool {
@@ -730,6 +750,7 @@ func (rf *Raft) consistencyCheck(n int) {
 	if pre < rf.snapshotIndex {
 		rf.sendSnapshot(n)
 	} else {
+		 DPrintf("[%d-%s]: consistency Check to peer %d.  %d,%d\n", rf.me, rf, n, pre, rf.snapshotIndex)
 		var args = AppendEntriesArgs{
 			Term:         rf.CurrentTerm,
 			LeaderID:     rf.me,
@@ -742,7 +763,7 @@ func (rf *Raft) consistencyCheck(n int) {
 			args.Entries = append(args.Entries, rf.Logs[rf.nextIndex[n]-rf.snapshotIndex:]...)
 		}
 		go func() {
-			DPrintf("[%d-%s]: consistency Check to peer %d.\n", rf.me, rf, n)
+			// DPrintf("[%d-%s]: consistency Check to peer %d.\n", rf.me, rf, n)
 			var reply AppendEntriesReply
 			if rf.sendAppendEntries(n, &args, &reply) {
 				rf.consistencyCheckReplyHandler(n, &reply)
