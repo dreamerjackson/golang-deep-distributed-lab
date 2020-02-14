@@ -1,4 +1,4 @@
-# golang[114]-raft理论与实践[6]-lab3a-基于raft构建分布式容错kv服务
+# raft理论与实践[6]-lab3a-基于raft构建分布式容错kv服务
 ## 准备工作
 *  阅读[raft论文](http://nil.csail.mit.edu/6.824/2017/papers/raft-extended.pdf)
 *  阅读[raft理论与实践[1]-理论篇](https://zhuanlan.zhihu.com/p/102023809)
