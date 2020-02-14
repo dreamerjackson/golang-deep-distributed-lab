@@ -20,7 +20,6 @@ package raft
 import (
 	"6.824-lab/labgob"
 	"bytes"
-	"fmt"
 	"math/rand"
 	"sort"
 	"sync"
@@ -770,6 +769,10 @@ func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *Ap
 func (rf *Raft) consistencyCheck(n int) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
+	// must for Partition
+	if rf.state != Leader {
+		return
+	}
 	// what if rf.nextIndex[n]-1 < snapshotIndex? just send snapshot?
 	pre := rf.nextIndex[n] - 1
 	if pre < rf.snapshotIndex {
@@ -777,12 +780,14 @@ func (rf *Raft) consistencyCheck(n int) {
 	} else {
 		previndex:= pre
 		prevlog := pre-rf.snapshotIndex
+		// why this situation. very small possible when Partition. (1-f,4-l) (0-l,2-f,3-l)
+		// when the Partition is break and every can connect. the 4 will be follow and 0 will shotsnap for it.
+		// so 4 can't consistencyCheck to 1. we can avoid it though check rf.state != Leader
 		if prevlog > len(rf.Logs) - 1 {
+			DPrintf("[%d-%s]: prevlog > len(rf.Logs) - 1 n:%d. prevlog:%d,rf.snapshotIndex:%d,len(rf.Logs):%d   \n", rf.me, rf, n,prevlog,rf.snapshotIndex,len(rf.Logs))
 			previndex = len(rf.Logs) + +rf.snapshotIndex - 1
 			prevlog = len(rf.Logs) - 1
-			fmt.Println("prevlog > len(rf.Logs) - 1",prevlog , len(rf.Logs) - 1)
 		}
-
 		//DPrintf("[%d-%s]: consistency Check to peer %d.  %d,%d\n", rf.me, rf, n, pre, rf.snapshotIndex)
 		var args = AppendEntriesArgs{
 			Term:         rf.CurrentTerm,
