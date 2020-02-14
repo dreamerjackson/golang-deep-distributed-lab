@@ -63,6 +63,10 @@ import (
 	"6.824-lab/labgob"
 )
 
+func init(){
+	rand.Seed(time.Now().UnixNano())
+}
+
 type reqMsg struct {
 	endname  interface{} // name of sending ClientEnd
 	svcMeth  string      // e.g. "Raft.AppendEntries"
@@ -95,7 +99,6 @@ func (e *ClientEnd) Call(svcMeth string, args interface{}, reply interface{}) bo
 	qe := labgob.NewEncoder(qb)
 	qe.Encode(args)
 	req.args = qb.Bytes()
-
 	//
 	// send the request.
 	//
@@ -106,7 +109,6 @@ func (e *ClientEnd) Call(svcMeth string, args interface{}, reply interface{}) bo
 		// entire Network has been destroyed.
 		return false
 	}
-
 	rep := <-req.replyCh
 	if rep.ok {
 		rb := bytes.NewBuffer(rep.reply)

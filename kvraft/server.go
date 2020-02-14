@@ -7,8 +7,10 @@ import (
 	"bytes"
 	"encoding/gob"
 	"log"
+	"math/rand"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 const Debug = 0
@@ -20,7 +22,9 @@ func DPrintf(format string, a ...interface{}) (n int, err error) {
 	return
 }
 
-
+func init(){
+	rand.Seed(time.Now().UnixNano())
+}
 type Op struct {
 	// Your definitions here.
 	// Field names must start with capital letters,
@@ -181,7 +185,6 @@ func (kv *KVServer) applyDaemon() {
 				// have snapshot to apply?
 				if msg.UseSnapshot {
 					kv.mu.Lock()
-					kv.snapshotIndex = msg.CommandIndex
 					kv.readSnapshot(msg.Snapshot)
 					// must be persisted, in case of crashing before generating another snapshot
 					kv.generateSnapshot(msg.CommandIndex)
@@ -214,12 +217,11 @@ func (kv *KVServer) applyDaemon() {
 					}
 					// snapshot detection: up through msg.Index
 					if needSnapshot(kv) {
-						kv.snapshotIndex = msg.CommandIndex
 						// save snapshot and notify raft
 						DPrintf("[%d]: server %d need generate snapshot @ %d (%d vs %d), client: %d.\n",
 							kv.me, kv.me, msg.CommandIndex, kv.maxraftstate, kv.persist.RaftStateSize(), cmd.ClientID)
-						kv.generateSnapshot(msg.CommandIndex)
-						kv.rf.NewSnapShot(msg.CommandIndex)
+						data:= kv.generateSnapshot(msg.CommandIndex)
+						kv.rf.NewSnapShot(data,msg.CommandIndex)
 					}
 
 					// notify channel
@@ -267,18 +269,6 @@ func (kv *KVServer) generateSnapshot(index int) []byte{
 	return data
 }
 
-func (kv *KVServer) snapshotData() []byte{
-	w := new(bytes.Buffer)
-	e := gob.NewEncoder(w)
-
-
-	e.Encode(kv.db)
-	e.Encode(kv.snapshotIndex)
-	e.Encode(kv.duplicate)
-	data := w.Bytes()
-
-	return data
-}
 
 func (kv *KVServer) readSnapshot(data []byte) {
 	if data == nil || len(data) < 1 { // bootstrap without any state?
@@ -338,7 +328,7 @@ func StartKVServer(servers []*labrpc.ClientEnd, me int, persister *raft.Persiste
 	kv := new(KVServer)
 	kv.me = me
 	kv.maxraftstate = maxraftstate
-
+	kv.dead =0
 	// You may need initialization code here.
 	kv.db = make(map[string]string)
 	kv.notifyChs = make(map[int]chan struct{})

@@ -1,7 +1,7 @@
 rm -rf res
 mkdir res
 set int j = 0
-for ((i = 0; j < 1; i++))
+for ((i = 0; i < 2; i++))
 do
     for ((c = $((i*10)); c < $(( (i+1)*10)); c++))
     do

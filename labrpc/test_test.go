@@ -1,12 +1,17 @@
 package labrpc
 
-import "testing"
+import (
+	"math/rand"
+	"testing"
+)
 import "strconv"
 import "sync"
 import "runtime"
 import "time"
 import "fmt"
-
+func init(){
+	rand.Seed(time.Now().UnixNano())
+}
 type JunkArgs struct {
 	X int
 }

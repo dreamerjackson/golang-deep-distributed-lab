@@ -20,6 +20,7 @@ package raft
 import (
 	"6.824-lab/labgob"
 	"bytes"
+	"fmt"
 	"math/rand"
 	"sort"
 	"sync"
@@ -28,6 +29,9 @@ import (
 
 	"6.824-lab/labrpc"
 )
+func init(){
+	rand.Seed(time.Now().UnixNano())
+}
 
 func max(a, b int) int {
 	if a > b {
@@ -113,13 +117,14 @@ type Raft struct {
 	shutdownCh  chan struct{} // shutdown channel, shut raft instance gracefully
 }
 
-func (rf *Raft) NewSnapShot(index int) {
+func (rf *Raft) NewSnapShot(Snapshotdata []byte,index int) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	if rf.commitIndex < index || index <= rf.snapshotIndex {
 		DPrintf("[%d-%s]: peer %d NewSnapShot(),commitIndex:%d index:%d.snapshotIndex:%d \n",
 			rf.me, rf, rf.me, rf.commitIndex,index,rf.snapshotIndex)
-		panic("NewSnapShot(): new.snapshotIndex <= old.snapshotIndex")
+		return
+		//panic("NewSnapShot(): new.snapshotIndex <= old.snapshotIndex")
 	}
 	// including the last of snapshot's log entry as the first log
 	rf.Logs = rf.Logs[index-rf.snapshotIndex:]
@@ -129,7 +134,9 @@ func (rf *Raft) NewSnapShot(index int) {
 
 	DPrintf("[%d-%s]: peer %d have new snapshot, %d @ %d.\n",
 		rf.me, rf, rf.me, rf.snapshotIndex, rf.snapshotTerm)
-	rf.persist()
+	//rf.persist()
+	rf.persister.SaveStateAndSnapshot(rf.stateData(),Snapshotdata)
+
 	//rf.persister.SaveStateAndSnapshot(snapShotData,rf.stateData())
 }
 // return currentTerm and whether this server
@@ -424,7 +431,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	if preLogIdx == args.PrevLogIndex && preLogTerm == args.PrevLogTerm {
 		reply.Success = true
 		// truncate to known match
-		rf.Logs = rf.Logs[:preLogIdx+1-rf.snapshotIndex]
+		rf.Logs = rf.Logs[:preLogIdx-rf.snapshotIndex+1]
 		rf.Logs = append(rf.Logs, args.Entries...)
 		var last = rf.snapshotIndex + len(rf.Logs) - 1
 
@@ -461,11 +468,11 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		reply.ConflictTerm = preLogTerm
 		if reply.ConflictTerm == 0 {
 			// which means leader has more logs or follower has no log at all
-			first = len(rf.Logs)
-			reply.ConflictTerm = rf.Logs[first-1].Term
+			first = len(rf.Logs)+ rf.snapshotIndex
+			reply.ConflictTerm = rf.Logs[first-rf.snapshotIndex-1].Term
 		} else {
 			i := preLogIdx - 1
-			for ; i > rf.snapshotIndex; i-- {
+			for ; i >= rf.snapshotIndex; i-- {
 				if rf.Logs[i-rf.snapshotIndex].Term != preLogTerm {
 					first = i + 1
 					break
@@ -478,8 +485,8 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 				rf.me, rf, args.LeaderID, args.PrevLogIndex, len(rf.Logs)-1, reply.ConflictTerm,
 				reply.FirstIndex)
 		} else {
-			DPrintf("[%d-%s]: AE failed from leader %d, pre idx/term mismatch (%d != %d, %d != %d).\n",
-				rf.me, rf, args.LeaderID, args.PrevLogIndex, preLogIdx, args.PrevLogTerm, preLogTerm)
+			DPrintf("[%d-%s]: AE failed from leader %d, pre idx/term mismatch (args.PrevLogIndex:%d != %d, args.PrevLogTerm:%d != %d).rf.snapshotIndex:%d,rf.snapshotTerm:%d\n",
+				rf.me, rf, args.LeaderID, args.PrevLogIndex, preLogIdx, args.PrevLogTerm, preLogTerm,rf.snapshotIndex,rf.snapshotTerm)
 		}
 	}
 	rf.persist()
@@ -548,13 +555,20 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 	// snapshot contains part of logs
 	DPrintf("[%d-%s]: rpc snapshot, snapshot have some logs (%d < %d + %d - 1).\n", rf.me, rf,
 		args.LastIncludedIndex, rf.snapshotIndex, len(rf.Logs))
+	//warning
+	tmp:=rf.Logs[args.LastIncludedIndex-rf.snapshotIndex+1:]
+	rf.Logs = []LogEntry{{args.LastIncludedTerm, nil}}
+	rf.Logs = append(rf.Logs,tmp...)
 
-	rf.Logs = rf.Logs[args.LastIncludedIndex-rf.snapshotIndex:]
 	rf.snapshotIndex = args.LastIncludedIndex
 	rf.snapshotTerm = args.LastIncludedTerm
 	rf.commitIndex = rf.snapshotIndex
 	rf.lastApplied = rf.snapshotIndex
-
+	//rf.commitIndex = max(rf.commitIndex,rf.snapshotIndex)
+	//rf.lastApplied = max(rf.lastApplied,rf.snapshotIndex)
+	//if rf.lastApplied > rf.snapshotIndex{
+	//	return
+	//}
 	rf.applyCh <- ApplyMsg{true,nil,rf.snapshotIndex,  true, args.Snapshot}
 
 	rf.persister.SaveStateAndSnapshot(rf.stateData(),args.Snapshot)
@@ -689,6 +703,9 @@ func (rf *Raft) consistencyCheckReplyHandler(n int, reply *AppendEntriesReply) {
 	if reply.Success {
 		// RPC and consistency check successful
 		rf.matchIndex[n] = reply.FirstIndex
+		if rf.matchIndex[n] >  len(rf.Logs)+rf.snapshotIndex - 1{
+			panic("rf.matchIndex[n] >= len(rf.Logs)")
+		}
 		rf.nextIndex[n] = rf.matchIndex[n] + 1
 		rf.updateCommitIndex() // try to update commitIndex
 	} else {
@@ -701,6 +718,7 @@ func (rf *Raft) consistencyCheckReplyHandler(n int, reply *AppendEntriesReply) {
 				rf.me, rf, rf.me, n)
 			return
 		}
+		tmpnextIndex := rf.nextIndex[n]
 
 		// Does leader know conflicting term?
 		var know, lastIndex = false, 0
@@ -730,6 +748,13 @@ func (rf *Raft) consistencyCheckReplyHandler(n int, reply *AppendEntriesReply) {
 		} else {
 			// snapshot + 1 <= rf.nextIndex[n] <= len(rf.Logs) + snapshot
 			rf.nextIndex[n] = min(max(rf.nextIndex[n], 1+rf.snapshotIndex), len(rf.Logs)+rf.snapshotIndex)
+
+			if tmpnextIndex == rf.nextIndex[n]{
+				rf.nextIndex[n] = max(rf.nextIndex[n]-1,rf.snapshotIndex)
+				DPrintf("[%d-%s]: very race bug %d  => %d (snapshot: %d).tmpnextIndex:%d,reply.ConflictTerm:%d,rf.CurrentTerm:%d\n",
+					rf.me, rf, n, rf.nextIndex[n], rf.snapshotIndex,tmpnextIndex,reply.ConflictTerm,rf.CurrentTerm)
+			}
+
 			DPrintf("[%d-%s]: nextIndex for peer %d  => %d (snapshot: %d).\n",
 				rf.me, rf, n, rf.nextIndex[n], rf.snapshotIndex)
 		}
@@ -750,12 +775,20 @@ func (rf *Raft) consistencyCheck(n int) {
 	if pre < rf.snapshotIndex {
 		rf.sendSnapshot(n)
 	} else {
-		 DPrintf("[%d-%s]: consistency Check to peer %d.  %d,%d\n", rf.me, rf, n, pre, rf.snapshotIndex)
+		previndex:= pre
+		prevlog := pre-rf.snapshotIndex
+		if prevlog > len(rf.Logs) - 1 {
+			previndex = len(rf.Logs) + +rf.snapshotIndex - 1
+			prevlog = len(rf.Logs) - 1
+			fmt.Println("prevlog > len(rf.Logs) - 1",prevlog , len(rf.Logs) - 1)
+		}
+
+		//DPrintf("[%d-%s]: consistency Check to peer %d.  %d,%d\n", rf.me, rf, n, pre, rf.snapshotIndex)
 		var args = AppendEntriesArgs{
 			Term:         rf.CurrentTerm,
 			LeaderID:     rf.me,
-			PrevLogIndex: pre,
-			PrevLogTerm:  rf.Logs[pre-rf.snapshotIndex].Term,
+			PrevLogIndex: previndex,
+			PrevLogTerm:  rf.Logs[prevlog].Term,
 			Entries:      nil,
 			LeaderCommit: rf.commitIndex,
 		}
@@ -763,7 +796,7 @@ func (rf *Raft) consistencyCheck(n int) {
 			args.Entries = append(args.Entries, rf.Logs[rf.nextIndex[n]-rf.snapshotIndex:]...)
 		}
 		go func() {
-			// DPrintf("[%d-%s]: consistency Check to peer %d.\n", rf.me, rf, n)
+			 DPrintf("[%d-%s]: consistency Check to peer %d.\n", rf.me, rf, n)
 			var reply AppendEntriesReply
 			if rf.sendAppendEntries(n, &args, &reply) {
 				rf.consistencyCheckReplyHandler(n, &reply)
@@ -841,9 +874,9 @@ func (rf *Raft) electionDaemon() {
 			}
 			rf.electionTimer.Reset(rf.electionTimeout)
 		case <-rf.electionTimer.C:
-			rf.mu.Lock()
 			DPrintf("[%d-%s]: peer %d election timeout, issue election @ term %d\n", rf.me, rf, rf.me, rf.CurrentTerm)
-			rf.mu.Unlock()
+			//fmt.Printf("[%d-%s]: peer %d election timeout, issue election @ term %d\n", rf.me, rf, rf.me, rf.CurrentTerm)
+
 			go rf.canvassVotes()
 			rf.electionTimer.Reset(rf.electionTimeout)
 		}
@@ -913,7 +946,8 @@ func (rf *Raft) applyLogEntryDaemon() {
 		if last < cur {
 			rf.lastApplied = rf.commitIndex
 			logs = make([]LogEntry, cur-last)
-			copy(logs, rf.Logs[last+1-rf.snapshotIndex:cur+1-rf.snapshotIndex])
+			//fmt.Println(cur,last,last+1-rf.snapshotIndex,cur+1-rf.snapshotIndex)
+			copy(logs, rf.Logs[last-rf.snapshotIndex+1:cur-rf.snapshotIndex+1])
 		}
 		rf.mu.Unlock()
 		for i := 0; i < cur-last; i++ {

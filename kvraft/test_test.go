@@ -13,6 +13,10 @@ import "strings"
 import "sync"
 import "sync/atomic"
 
+func init(){
+	rand.Seed(time.Now().UnixNano())
+}
+
 // The tester generously allows solutions to complete elections in one second
 // (much more than the paper's range of timeouts).
 const electionTimeout = 1 * time.Second
@@ -269,7 +273,6 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 			v := Get(cfg, ck, key)
 			checkClntAppends(t, i, v, j)
 		}
-
 		if maxraftstate > 0 {
 			// Check maximum after the servers have processed all client
 			// requests and had time to checkpoint.
