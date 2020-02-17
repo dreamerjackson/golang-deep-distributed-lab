@@ -45,7 +45,7 @@
   + znodes的类型：Regular(客户端通过显式创建和删除常规znode来操作它们)，empheral(客户端创建了此类znode，它们要么显式删除它们，要么让系统在创建它们的会话终止时（故意或由于失败）自动将其删除)
   + 为了引用给定的znode，我们使用标准的UNIX符号表示文件系统路径。 例如，我们使用/A/B/C表示 znode C的路径，其中C的父节点为B，B的父节点为A，除empheral节点外，所有节点都可以有子节点
   + znode命名规则: name + 序列号。  如果n是新的znode，p是父znode，则n的序列值永远不会小于在p下创建的任何其他znode名称中的序列值
-  + ZooKeeper的数据模型本质上是一个具有简单API且只能读取和写入完整数据的文件系统，或者是具有层次结构键的键/值表。 层次名称空间对于为不同应用程序的名称空间分配子树以及设置对这些子树的访问权限很有用。
+  + ZooKeeper的数据模型本质上是一个具有简单API且只能读取和写入完整数据的文件系统，或者是具有层次结构键的键/值表。 分层名称空间对于为不同应用程序的名称空间分配子树以及设置对这些子树的访问权限很有用。
 * 会话(session)
   + 客户端连接上zookeeper时会初始化会话
   + 会话允许在故障发生时，客户端请求转移到另一个服务（client知道最后完成操作的术语和索引）
@@ -66,13 +66,13 @@
   + read操作能够感知到相同客户端的其他写操作
   + read操作能够感知之前的写操作针对相同的znode
 
-## ready znode与配置改变
+## Zookeeper用例：ready znode与配置改变
 * ZooKeeper中，新的leader可以将某个path指定为ready znode。 其他节点将仅在该znode存在时使用配置。
 * 当leader 重建配置之后，会通知其他副本重建配置，并新建ready znode.
 * 副本为了防止出现不一致，必须在重建配置时，处理完其之前的所有事务。保证所有服务的状态一致。
 * 任何一个副本更新失败，都不能够应用都需要进行重试。
 
-## Zookeeper使用lock的例子
+## Zookeeper用例：锁
 * 下面的伪代码向我们锁的实现。通过create试图持有锁，如果锁已经被其他的client持有，则通过watch方式监控锁的释放。
 ```
 acquire lock:
@@ -144,11 +144,11 @@ acquire lock:
 * 心跳检测以及建立session时都会返回zxid，当客户端连接服务器时，通过zxid对比保证client与server的状态足够接近
 
 ## 总结
-* Zookeeper通过将wait-free对象暴露给客户端解决分布式系统中的服务协调问题
-* Zookeeper保证了服务写入的线性一致性以及客户端的FIFO顺序
+* Zookeeper通过将wait-free对象（znode对象）暴露给客户端解决分布式系统中的进程协调问题
+* Zookeeper保证了write操作的线性一致性以及客户端操作的FIFO顺序
 * Zookeeper通过允许读取操作返回过时数据实现了每秒数十万次操作的吞吐量值，适用于多读而少些的场景
 * Zookeeper仍然提供了保证读一致性的sync操作
-* Zookeeper具有强大的API功能以及其多样的应用场景，并且内在提供主从容错机制，在包括雅虎在内的多家公司广泛应用
+* Zookeeper具有强大的API功能用于多样的应用场景，并且内在提供主从容错机制，在包括雅虎在内的多家公司广泛应用
 
 ## 参考资料
 * [讲义](https://pdos.csail.mit.edu/6.824/notes/l-vm-ft.txt)
