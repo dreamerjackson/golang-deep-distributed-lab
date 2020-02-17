@@ -38,7 +38,7 @@
   + 主从复制的是znodes对象
   + znode是客户端通过ZooKeeper API处理的数据对象，znodes以路径命名，其通过分层的[名称空间](https://en.wikipedia.org/wiki/Namespace)组织，类似于unix的文件系统
 
-![znode 分层命名空间](picture/4.png)
+![znode 分层命名空间](../picture/4.png)
 
   + 分层的名称空间是组织数据对象的一种理想方式，因为用户已经习惯了这种抽象，并且可以更好地组织应用程序元数据。
   + znodes包含应用程序的元数据（配置信息、时间戳、版本号）
