@@ -140,6 +140,15 @@ acquire lock:
 * 读取吞吐量随着服务器数量的增加而增加
 * 读取返回它看到的最后一个zxid
 * 只有sync-read() 保证数据不过时
+* read操作会返回zxid,zxid包含了部分客户端对于此read请求相对应的write请求的顺序，从而客户端能够了解此server操作是否落后于client。
+* 心跳检测以及建立session时都会返回zxid，当客户端连接服务器时，通过zxid对比保证client与server的状态足够接近
+
+## 总结
+* Zookeeper通过将wait-free对象暴露给客户端解决分布式系统中的服务协调问题
+* Zookeeper保证了服务写入的线性一致性以及客户端的FIFO顺序
+* Zookeeper通过允许读取操作返回过时数据实现了每秒数十万次操作的吞吐量值，适用于多读而少些的场景
+* Zookeeper仍然提供了保证读一致性的sync操作
+* Zookeeper具有强大的API功能以及其多样的应用场景，并且内在提供主从容错机制，在包括雅虎在内的多家公司广泛应用
 
 ## 参考资料
 * [讲义](https://pdos.csail.mit.edu/6.824/notes/l-vm-ft.txt)
